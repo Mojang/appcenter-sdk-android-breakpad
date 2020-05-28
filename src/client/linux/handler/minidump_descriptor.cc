@@ -43,6 +43,7 @@ MinidumpDescriptor::MinidumpDescriptor(const MinidumpDescriptor& descriptor)
     : mode_(descriptor.mode_),
       fd_(descriptor.fd_),
       directory_(descriptor.directory_),
+      sessionid_(descriptor.sessionid_),
       c_path_(NULL),
       size_limit_(descriptor.size_limit_),
       address_within_principal_mapping_(
@@ -64,6 +65,7 @@ MinidumpDescriptor& MinidumpDescriptor::operator=(
   mode_ = descriptor.mode_;
   fd_ = descriptor.fd_;
   directory_ = descriptor.directory_;
+  sessionid_ = descriptor.sessionid_;
   path_.clear();
   if (c_path_) {
     // This descriptor already had a path set, so generate a new one.
@@ -80,17 +82,22 @@ MinidumpDescriptor& MinidumpDescriptor::operator=(
   return *this;
 }
 
+// NOTE: for android we really shouldnt be using the guid at all
 void MinidumpDescriptor::UpdatePath() {
   assert(mode_ == kWriteMinidumpToFile && !directory_.empty());
-
-  GUID guid;
-  char guid_str[kGUIDStringLength + 1];
-  if (!CreateGUID(&guid) || !GUIDToString(&guid, guid_str, sizeof(guid_str))) {
-    assert(false);
-  }
-
+  
   path_.clear();
-  path_ = directory_ + "/" + guid_str + ".dmp";
+  if (sessionid_.empty()) {
+    GUID guid;
+    char guid_str[kGUIDStringLength + 1];
+    if (!CreateGUID(&guid) || !GUIDToString(&guid, guid_str, sizeof(guid_str))) {
+      assert(false);
+    }
+    path_ = directory_ + "/" + guid_str + ".dmp";
+  }
+  else {
+    path_ = directory_ + "/" + sessionid_ + ".dmp";
+  }
   c_path_ = path_.c_str();
 }
 
