@@ -221,12 +221,14 @@ kern_return_t catch_exception_raise(mach_port_t port, mach_port_t failed_thread,
 #endif
 
 ExceptionHandler::ExceptionHandler(const string &dump_path,
+                                   const string &session_id,
                                    FilterCallback filter,
                                    MinidumpCallback callback,
                                    void* callback_context,
                                    bool install_handler,
                                    const char* port_name)
     : dump_path_(),
+      session_id_(session_id),
       filter_(filter),
       callback_(callback),
       callback_context_(callback_context),
@@ -246,6 +248,21 @@ ExceptionHandler::ExceptionHandler(const string &dump_path,
     crash_generation_client_.reset(new CrashGenerationClient(port_name));
 #endif
   Setup(install_handler);
+}
+
+ExceptionHandler::ExceptionHandler(const string &dump_path,
+                                   FilterCallback filter,
+                                   MinidumpCallback callback,
+                                   void* callback_context,
+                                   bool install_handler,
+                                   const char* port_name)
+    : ExceptionHandler(dump_path,
+                       string(),
+                       filter,
+                       callback,
+                       callback_context,
+                       install_handler,
+                       port_name) {
 }
 
 // special constructor if we want to bypass minidump writing and
@@ -814,8 +831,23 @@ bool ExceptionHandler::SendMessageToHandlerThread(
 }
 
 void ExceptionHandler::UpdateNextID() {
-  next_minidump_path_ =
-    (MinidumpGenerator::UniqueNameInDirectory(dump_path_, &next_minidump_id_));
+  if (session_id_.empty()) {
+    next_minidump_path_ =
+      (MinidumpGenerator::UniqueNameInDirectory(dump_path_, &next_minidump_id_));
+  }
+  else {
+    next_minidump_path_ = dump_path_;
+    // Ensure that the directory (if non-empty) has a trailing slash so that
+    // we can append the file name and have a valid pathname.
+    if (!next_minidump_path_.empty()) {
+      if (next_minidump_path_.at(next_minidump_path_.size() - 1) != '/')
+        next_minidump_path_.append(1, '/');
+    }
+
+    next_minidump_path_.append(session_id_);
+    next_minidump_path_.append(".dmp");
+    next_minidump_id_ = session_id_;
+  }
 
   next_minidump_path_c_ = next_minidump_path_.c_str();
   next_minidump_id_c_ = next_minidump_id_.c_str();
