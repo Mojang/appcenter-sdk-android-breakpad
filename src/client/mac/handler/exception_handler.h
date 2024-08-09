@@ -106,10 +106,15 @@ class ExceptionHandler {
   // be written when WriteMinidump is called.
   // If port_name is non-NULL, attempt to perform out-of-process dump generation
   // If port_name is NULL, in-process dump generation will be used.
-  ExceptionHandler(const string &dump_path,
+  ExceptionHandler(const string &dump_path, const string &session_id,
                    FilterCallback filter, MinidumpCallback callback,
                    void *callback_context, bool install_handler,
 		   const char *port_name);
+
+  ExceptionHandler(const string &dump_path,
+                   FilterCallback filter, MinidumpCallback callback,
+                   void *callback_context, bool install_handler,
+                   const char *port_name);
 
   // A special constructor if we want to bypass minidump writing and
   // simply get a callback with the exception information.
@@ -222,6 +227,9 @@ class ExceptionHandler {
 
   // The full path to the next minidump to be written, including extension
   string next_minidump_path_;
+
+  // Telemetry session ID
+  string session_id_;
 
   // Pointers to the UTF-8 versions of above
   const char *dump_path_c_;
