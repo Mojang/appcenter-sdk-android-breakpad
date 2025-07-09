@@ -69,7 +69,7 @@ namespace google_breakpad {
 #endif
 
 // constructor when generating from within the crashed process
-MinidumpGenerator::MinidumpGenerator()
+MinidumpGenerator::MinidumpGenerator(const AppMemoryList &app_memory_list)
     : writer_(),
       exception_type_(0),
       exception_code_(0),
@@ -80,14 +80,16 @@ MinidumpGenerator::MinidumpGenerator()
       cpu_type_(DynamicImages::GetNativeCPUType()),
       task_context_(NULL),
       dynamic_images_(NULL),
-      memory_blocks_(&allocator_) {
+      memory_blocks_(&allocator_),
+      app_memory_list_(app_memory_list) {
   GatherSystemInformation();
 }
 
 // constructor when generating from a different process than the
 // crashed process
 MinidumpGenerator::MinidumpGenerator(mach_port_t crashing_task,
-                                     mach_port_t handler_thread)
+                                     mach_port_t handler_thread,
+                                     const AppMemoryList &app_memory_list)
     : writer_(),
       exception_type_(0),
       exception_code_(0),
@@ -98,7 +100,8 @@ MinidumpGenerator::MinidumpGenerator(mach_port_t crashing_task,
       cpu_type_(DynamicImages::GetNativeCPUType()),
       task_context_(NULL),
       dynamic_images_(NULL),
-      memory_blocks_(&allocator_) {
+      memory_blocks_(&allocator_),
+      app_memory_list_(app_memory_list) {
   if (crashing_task != mach_task_self()) {
     dynamic_images_ = new DynamicImages(crashing_task_);
     cpu_type_ = dynamic_images_->GetCPUType();
@@ -223,6 +226,7 @@ string MinidumpGenerator::UniqueNameInDirectory(const string &dir,
 bool MinidumpGenerator::Write(const char *path) {
   WriteStreamFN writers[] = {
     &MinidumpGenerator::WriteThreadListStream,
+    &MinidumpGenerator::WriteAppMemoryStream,
     &MinidumpGenerator::WriteMemoryListStream,
     &MinidumpGenerator::WriteSystemInfoStream,
     &MinidumpGenerator::WriteModuleListStream,
@@ -1023,6 +1027,21 @@ bool MinidumpGenerator::WriteThreadListStream(
     }
   }
 
+  return true;
+}
+
+bool MinidumpGenerator::WriteAppMemoryStream(MDRawDirectory*) {
+  for (const auto& app_memory : app_memory_list_) {
+    UntypedMDRVA memory(&writer_);
+    if (!memory.Allocate(app_memory.length)) {
+      return false;
+    }
+    memory.Copy(app_memory.ptr, app_memory.length);
+    MDMemoryDescriptor desc;
+    desc.start_of_memory_range = reinterpret_cast<uintptr_t>(app_memory.ptr);
+    desc.memory = memory.location();
+    memory_blocks_.push_back(desc);
+  }
   return true;
 }
 

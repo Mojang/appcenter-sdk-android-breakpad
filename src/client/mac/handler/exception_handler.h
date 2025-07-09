@@ -41,6 +41,7 @@
 
 #include <string>
 
+#include "client/mac/handler/minidump_generator.h"
 #include "client/mac/handler/ucontext_compat.h"
 #include "common/scoped_ptr.h"
 
@@ -169,6 +170,13 @@ class ExceptionHandler {
 #endif
   }
 
+  // Register a block of memory of length bytes starting at address ptr
+  // to be copied to the minidump when a crash occurs.
+  void RegisterAppMemory(void* ptr, size_t length);
+
+  // Unregister a block of memory that was registered with RegisterAppMemory.
+  void UnregisterAppMemory(void* ptr);
+
  private:
   // Install the mach exception handler
   bool InstallHandler();
@@ -277,6 +285,9 @@ class ExceptionHandler {
   // Old signal handler for SIGABRT. Used to be able to restore it when
   // uninstalling.
   scoped_ptr<struct sigaction> old_handler_;
+
+  // Additional memory regions to be included in the dump
+  AppMemoryList app_memory_list_;
 
 #if !TARGET_OS_IPHONE
   // Client for out-of-process dump generation.
