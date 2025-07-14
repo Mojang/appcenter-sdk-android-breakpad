@@ -338,7 +338,8 @@ bool ExceptionHandler::WriteMinidumpForChild(mach_port_t child,
                                              void* callback_context) {
   ScopedTaskSuspend suspend(child);
 
-  MinidumpGenerator generator(child, MACH_PORT_NULL);
+  AppMemoryList app_memory_list;
+  MinidumpGenerator generator(child, MACH_PORT_NULL, app_memory_list);
   string dump_id;
   string dump_filename = generator.UniqueNameInDirectory(dump_path, &dump_id);
 
@@ -412,8 +413,10 @@ bool ExceptionHandler::WriteMinidumpWithException(
     if (!dump_path_.empty()) {
       MinidumpGenerator md(mach_task_self(),
                            report_current_thread ? MACH_PORT_NULL :
-                                                   mach_thread_self());
+                                                   mach_thread_self(),
+                           app_memory_list_);
       md.SetTaskContext(task_context);
+
       if (exception_type && exception_code) {
         // If this is a real exception, give the filter (if any) a chance to
         // decide if this should be sent.
@@ -887,6 +890,24 @@ bool ExceptionHandler::ResumeThreads() {
   }
 
   return true;
+}
+
+void ExceptionHandler::RegisterAppMemory(void *ptr, size_t length) {
+  AppMemoryList::iterator iter = std::find(app_memory_list_.begin(), app_memory_list_.end(), ptr);
+  if (iter != app_memory_list_.end()) {
+    return;
+  }
+  AppMemory app_memory;
+  app_memory.ptr = ptr;
+  app_memory.length = length;
+  app_memory_list_.push_back(app_memory);
+}
+
+void ExceptionHandler::UnregisterAppMemory(void *ptr) {
+  AppMemoryList::iterator iter = std::find(app_memory_list_.begin(), app_memory_list_.end(), ptr);
+  if (iter != app_memory_list_.end()) {
+    app_memory_list_.erase(iter);
+  }
 }
 
 }  // namespace google_breakpad
